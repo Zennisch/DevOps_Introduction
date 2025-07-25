@@ -193,4 +193,6 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 **/.terraform*
-**/terraform*
+**/.terraform.lock.hcl
+**/terraform.tfstate*
+gcp_key.json

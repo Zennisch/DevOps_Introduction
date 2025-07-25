@@ -1,0 +1,24 @@
+variable "gcp_svc_key" {}
+variable "gcp_project" {}
+variable "gcp_region" {}
+variable "bucket_name" {}
+variable "bucket_location" {}
+variable "object_name" {}
+variable "object_source" {}
+variable "object_role" {}
+variable "object_entity" {}
+variable "global_address_name" {}
+variable "dns_zone_name" {}
+variable "dns_record_type" {}
+variable "dns_record_ttl" {}
+variable "backend_bucket_name" {}
+variable "backend_bucket_description" {}
+variable "backend_bucket_enable_cdn" {}
+variable "url_map_name" {}
+variable "url_map_hosts" { type = list(string) }
+variable "url_map_path_matcher" {}
+variable "target_http_proxy_name" {}
+variable "forwarding_rule_name" {}
+variable "forwarding_rule_scheme" {}
+variable "forwarding_rule_protocol" {}
+variable "forwarding_rule_port" {}
