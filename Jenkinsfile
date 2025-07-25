@@ -27,7 +27,7 @@ pipeline {
                 echo 'Installing application dependencies'
                 sh '''
                 . .venv/bin/activate
-                cd app
+                cd console_app
                 pip3 install -r requirements.txt
                 '''
             }
@@ -37,7 +37,7 @@ pipeline {
                 echo 'Testing application functionality'
                 sh '''
                 . .venv/bin/activate
-                cd app
+                cd console_app
                 python3 HelloWorld.py
                 '''
             }
@@ -48,7 +48,7 @@ pipeline {
                 echo 'Installing Flask dependencies'
                 sh '''
                 . .venv/bin/activate
-                cd webapp
+                cd website_app
                 pip3 install -r requirements.txt
                 '''
             }
