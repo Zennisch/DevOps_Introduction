@@ -5,12 +5,35 @@ pipeline {
         }
     }
     environment {
-        DOCKER_HOST = 'tcp://alpine-socat:2375'
+        DOCKER_HOST = 'tcp://jenkins-proxy:2375'
     }
     triggers {
         pollSCM '* * * * *'
     }
     stages {
+        stage('Load env file') {
+            steps {
+                echo 'Loading environment variables from GCP credentials'
+                echo 'Make sure the GCP_ENV_FILE and GCP_KEY_FILE credentials are set up in Jenkins'
+                withCredentials([file(credentialsId: 'GCP_ENV_FILE', variable: 'ENV_FILE')]) {
+                    sh "cp '$ENV_FILE' '$WORKSPACE/.env'"
+                }
+                withCredentials([file(credentialsId: 'GCP_KEY_FILE', variable: 'KEY_FILE')]) {
+                    sh "cp '$KEY_FILE' '$WORKSPACE/gcp_key.json'"
+                }
+            }
+        }
+        stage('Test env variables') {
+            steps {
+                echo 'Verifying environment variables are set correctly'
+                sh '''
+                . "$WORKSPACE/.env"
+                echo "GCP_PROJECT: $GCP_PROJECT"
+                echo "GCP_REGION: $GCP_REGION"
+                '''
+                echo "Environment variables are set correctly"
+            }
+        }
         stage('Setup Python Environment') {
             steps {
                 echo 'Checking Python version'
@@ -21,7 +44,7 @@ pipeline {
                 sh '. .venv/bin/activate'
             }
         }
-        stage('Build') {
+        stage('Build Console App') {
             steps {
                 echo 'Navigating to app directory'
                 echo 'Installing application dependencies'
@@ -32,7 +55,7 @@ pipeline {
                 '''
             }
         }
-        stage('Test') {
+        stage('Test Console App') {
             steps {
                 echo 'Testing application functionality'
                 sh '''
@@ -57,9 +80,9 @@ pipeline {
             steps {
                 echo 'Building Docker container image'
                 echo "Using Docker host: ${DOCKER_HOST}"
-                sh 'docker build -t python-simple-flask:${BUILD_NUMBER} .'
+                sh "docker build -t python-simple-flask:${BUILD_NUMBER} ."
                 echo 'Tagging image as latest'
-                sh 'docker tag python-simple-flask:${BUILD_NUMBER} python-simple-flask:latest'
+                sh "docker tag python-simple-flask:${BUILD_NUMBER} python-simple-flask:latest"
             }
         }
         stage('Test Container') {
@@ -70,7 +93,7 @@ pipeline {
                 echo 'Displaying Docker host information'
                 sh 'docker info'
                 echo 'Starting container in test mode'
-                sh 'docker run -d --name flask-test-container -p 30001:30000 --network jenkins python-simple-flask:${BUILD_NUMBER}'
+                sh "docker run -d --name flask-test-container -p 30001:30000 --network jenkins python-simple-flask:${BUILD_NUMBER}"
                 echo 'Waiting for container to initialize'
                 sh 'sleep 5'
                 echo 'Displaying container logs'
@@ -92,10 +115,45 @@ pipeline {
                 echo 'Removing existing production container'
                 sh 'docker rm flask-production-container || true'
                 echo 'Starting new production container'
-                sh 'docker run -d --name flask-production-container -p 30000:30000 --network jenkins python-simple-flask:${BUILD_NUMBER}'
+                sh "docker run -d --name flask-production-container -p 30000:30000 --network jenkins python-simple-flask:${BUILD_NUMBER}"
                 echo 'Verifying production container is running'
                 sh 'docker ps | grep flask-production-container || (echo "Container failed to start" && exit 1)'
                 echo 'Flask server container deployed on port 30000'
+            }
+        }
+        stage('Push to GCR') {
+            steps {
+                echo 'Pushing Docker image to Google Container Registry'
+                echo 'Authenticating with Google Cloud'
+                sh '''
+                    set +x
+                    set -a
+                    cat "$WORKSPACE/.env" | tr -d '\r' | sed 's/[[:space:]]*$//' > "$WORKSPACE/.env.clean"
+                    . "$WORKSPACE/.env.clean"
+                    set +a
+                    gcloud auth activate-service-account --key-file="$WORKSPACE/gcp_key.json" --project="$GCP_PROJECT"
+                    gcloud config set project "$GCP_PROJECT"
+                    gcloud auth configure-docker
+                    docker tag python-simple-flask:${BUILD_NUMBER} gcr.io/${GCP_PROJECT}/python-simple-flask:${BUILD_NUMBER}
+                    docker push gcr.io/${GCP_PROJECT}/python-simple-flask:${BUILD_NUMBER}
+                    docker tag python-simple-flask:latest gcr.io/${GCP_PROJECT}/python-simple-flask:latest
+                    docker push gcr.io/${GCP_PROJECT}/python-simple-flask:latest
+                '''
+            }
+        }
+        stage('Deploy to Cloud Run') {
+            steps {
+                sh '''
+                    set +x
+                    . "$WORKSPACE/.env.clean"
+                    gcloud run deploy python-simple-service \
+                        --project="$GCP_PROJECT" \
+                        --region="$GCP_REGION" \
+                        --image=gcr.io/${GCP_PROJECT}/python-simple-flask:latest \
+                        --platform=managed \
+                        --allow-unauthenticated \
+                        --port=30000
+                '''
             }
         }
     }
