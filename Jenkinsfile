@@ -16,22 +16,11 @@ pipeline {
                 echo 'Loading environment variables from GCP credentials'
                 echo 'Make sure the GCP_ENV_FILE and GCP_KEY_FILE credentials are set up in Jenkins'
                 withCredentials([file(credentialsId: 'GCP_ENV_FILE', variable: 'ENV_FILE')]) {
-                    sh "cp '$ENV_FILE' '$WORKSPACE/.env'"
+                    sh 'cp "$ENV_FILE" "$WORKSPACE/.env"'
                 }
                 withCredentials([file(credentialsId: 'GCP_KEY_FILE', variable: 'KEY_FILE')]) {
-                    sh "cp '$KEY_FILE' '$WORKSPACE/gcp_key.json'"
+                    sh 'cp "$KEY_FILE" "$WORKSPACE/gcp_key.json"'
                 }
-            }
-        }
-        stage('Test env variables') {
-            steps {
-                echo 'Verifying environment variables are set correctly'
-                sh '''
-                . "$WORKSPACE/.env"
-                echo "GCP_PROJECT: $GCP_PROJECT"
-                echo "GCP_REGION: $GCP_REGION"
-                '''
-                echo "Environment variables are set correctly"
             }
         }
         stage('Setup Python Environment') {
@@ -79,21 +68,21 @@ pipeline {
         stage('Build Container Image') {
             steps {
                 echo 'Building Docker container image'
-                echo "Using Docker host: ${DOCKER_HOST}"
-                sh "docker build -t python-simple-flask:${BUILD_NUMBER} ."
+                echo 'Using Docker host: ${DOCKER_HOST}'
+                sh 'docker build -t python-simple-flask:${BUILD_NUMBER} .'
                 echo 'Tagging image as latest'
-                sh "docker tag python-simple-flask:${BUILD_NUMBER} python-simple-flask:latest"
+                sh 'docker tag python-simple-flask:${BUILD_NUMBER} python-simple-flask:latest'
             }
         }
         stage('Test Container') {
             steps {
                 echo 'Verifying Docker container image exists'
-                echo "Checking for image python-simple-flask:${BUILD_NUMBER}"
+                echo 'Checking for image python-simple-flask:${BUILD_NUMBER}'
                 sh 'docker images | grep python-simple-flask'
                 echo 'Displaying Docker host information'
                 sh 'docker info'
                 echo 'Starting container in test mode'
-                sh "docker run -d --name flask-test-container -p 30001:30000 --network jenkins python-simple-flask:${BUILD_NUMBER}"
+                sh 'docker run -d --name flask-test-container -p 30001:30000 --network jenkins python-simple-flask:${BUILD_NUMBER}'
                 echo 'Waiting for container to initialize'
                 sh 'sleep 5'
                 echo 'Displaying container logs'
@@ -115,7 +104,7 @@ pipeline {
                 echo 'Removing existing production container'
                 sh 'docker rm flask-production-container || true'
                 echo 'Starting new production container'
-                sh "docker run -d --name flask-production-container -p 30000:30000 --network jenkins python-simple-flask:${BUILD_NUMBER}"
+                sh 'docker run -d --name flask-production-container -p 30000:30000 --network jenkins python-simple-flask:${BUILD_NUMBER}'
                 echo 'Verifying production container is running'
                 sh 'docker ps | grep flask-production-container || (echo "Container failed to start" && exit 1)'
                 echo 'Flask server container deployed on port 30000'
